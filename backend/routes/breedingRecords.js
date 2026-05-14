@@ -3,6 +3,7 @@ const router = express.Router();
 const { BreedingRecord, Animal } = require('../models');
 const auth = require('../middleware/auth');
 const { breedingRecommendation } = require('../services/aiService');
+const { aiRateLimiter } = require('../middleware/rateLimiter');
 
 router.get('/', auth, async (req, res) => {
   try {
@@ -42,7 +43,7 @@ router.delete('/:id', auth, async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.post('/:id/ai-recommendation', auth, async (req, res) => {
+router.post('/:id/ai-recommendation', auth, aiRateLimiter, async (req, res) => {
   try {
     const record = await BreedingRecord.findByPk(req.params.id, { include: [Animal] });
     if (!record) return res.status(404).json({ error: 'Record not found' });

@@ -15,7 +15,10 @@ const HealthRecord = sequelize.define('HealthRecord', {
   treatment: { type: DataTypes.TEXT },
   veterinarian: { type: DataTypes.STRING },
   status: { type: DataTypes.STRING, defaultValue: 'Normal' },
-  notes: { type: DataTypes.TEXT }
+  notes: { type: DataTypes.TEXT },
+  ai_assessment: { type: DataTypes.TEXT },
+  ai_urgency: { type: DataTypes.STRING },
+  ai_assessed_at: { type: DataTypes.DATE }
 });
 
 module.exports = HealthRecord;

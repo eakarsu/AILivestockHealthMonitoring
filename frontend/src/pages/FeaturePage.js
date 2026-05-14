@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as API from '../services/api';
 import AIResultDisplay from '../components/AIResultDisplay';
+import HealthTrendChart from '../components/HealthTrendChart';
 
 const featureConfigs = {
   'animals': {
@@ -65,7 +66,7 @@ const featureConfigs = {
       { name: 'notes', label: 'Notes', type: 'textarea' },
     ],
     hasAI: true, aiLabel: 'AI Disease Prediction',
-    aiAction: (api, id, item) => api.aiPredict({ symptoms: item?.symptoms || '', animalType: item?.Animal?.species || 'Cattle', history: item }),
+    aiAction: (api, id, item) => api.aiPredict({ symptoms: item?.symptoms || '', animalType: item?.Animal?.species || item?.animal_type || 'Cattle', history: item, animal_id: item?.animal_id || item?.Animal?.id || null }),
   },
   'vaccinations': {
     title: 'Vaccination Tracking', api: API.vaccinationsAPI, icon: '💉',
@@ -294,12 +295,42 @@ function FeaturePage({ user, onLogout }) {
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [herdRiskResult, setHerdRiskResult] = useState(null);
+  const [herdRiskLoading, setHerdRiskLoading] = useState(false);
+  const [allAnimals, setAllAnimals] = useState([]);
+  const PAGE_SIZE = 20;
 
-  const loadData = useCallback(async () => {
+  // Load all animals for disease detection animal selector
+  useEffect(() => {
+    if (featureKey === 'disease-detection') {
+      API.animalsAPI.getAll({ limit: 200 }).then(r => {
+        const data = r.data;
+        setAllAnimals(Array.isArray(data) ? data : data.data || []);
+      }).catch(() => {});
+    }
+  }, [featureKey]);
+
+  const loadData = useCallback(async (pageNum = 1) => {
     try {
       setLoading(true);
-      const res = await config.api.getAll();
-      setItems(res.data);
+      const res = await config.api.getAll({ page: pageNum, limit: PAGE_SIZE });
+      const data = res.data;
+      if (data && data.data && data.pagination) {
+        setItems(data.data);
+        setTotalPages(data.pagination.totalPages || 1);
+        setTotalCount(data.pagination.total || 0);
+      } else if (Array.isArray(data)) {
+        setItems(data);
+        setTotalPages(1);
+        setTotalCount(data.length);
+      } else {
+        setItems(data);
+        setTotalPages(1);
+        setTotalCount(0);
+      }
     } catch (err) {
       setError('Failed to load data');
     }
@@ -307,8 +338,13 @@ function FeaturePage({ user, onLogout }) {
   }, [config.api]);
 
   useEffect(() => {
-    if (config) loadData();
-  }, [featureKey, config, loadData]);
+    if (config) loadData(page);
+  }, [featureKey, config, loadData, page]);
+
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || newPage > totalPages) return;
+    setPage(newPage);
+  };
 
   if (!config) return <div>Feature not found</div>;
 
@@ -382,6 +418,19 @@ function FeaturePage({ user, onLogout }) {
     setAiLoading(false);
   };
 
+  const handleHerdRisk = async (herd) => {
+    if (!herd?.id) return;
+    setHerdRiskLoading(true);
+    setHerdRiskResult(null);
+    try {
+      const res = await API.herdsAPI.riskAssessment(herd.id);
+      setHerdRiskResult(res.data);
+    } catch (err) {
+      setHerdRiskResult({ error: err.response?.data?.error || 'Risk assessment failed' });
+    }
+    setHerdRiskLoading(false);
+  };
+
   const formatValue = (val, col) => {
     if (val === null || val === undefined) return '-';
     if (typeof val === 'boolean') return val ? 'Yes' : 'No';
@@ -424,7 +473,7 @@ function FeaturePage({ user, onLogout }) {
       <main className="feature-content">
         <div className="feature-toolbar">
           <div className="toolbar-left">
-            <span className="record-count">{items.length} records</span>
+            <span className="record-count">{totalCount || items.length} records</span>
           </div>
           <div className="toolbar-right">
             {config.hasAI && !['animals', 'health-records', 'breeding-records', 'disease-detection'].includes(featureKey) && (
@@ -474,6 +523,34 @@ function FeaturePage({ user, onLogout }) {
           </div>
         )}
 
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '16px', justifyContent: 'center' }}>
+            <button
+              style={{ padding: '6px 12px', border: '1px solid #E2E8F0', borderRadius: '6px', backgroundColor: '#fff', cursor: 'pointer', opacity: page <= 1 ? 0.4 : 1 }}
+              onClick={() => handlePageChange(page - 1)} disabled={page <= 1}
+            >&laquo; Prev</button>
+            {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+              let pn;
+              if (totalPages <= 7) pn = i + 1;
+              else if (page <= 4) pn = i + 1;
+              else if (page >= totalPages - 3) pn = totalPages - 6 + i;
+              else pn = page - 3 + i;
+              return (
+                <button
+                  key={pn}
+                  style={{ padding: '6px 12px', border: '1px solid #E2E8F0', borderRadius: '6px', cursor: 'pointer', backgroundColor: pn === page ? '#4F46E5' : '#fff', color: pn === page ? '#fff' : '#334155' }}
+                  onClick={() => handlePageChange(pn)}
+                >{pn}</button>
+              );
+            })}
+            <button
+              style={{ padding: '6px 12px', border: '1px solid #E2E8F0', borderRadius: '6px', backgroundColor: '#fff', cursor: 'pointer', opacity: page >= totalPages ? 0.4 : 1 }}
+              onClick={() => handlePageChange(page + 1)} disabled={page >= totalPages}
+            >Next &raquo;</button>
+          </div>
+        )}
+
         {/* Detail Modal */}
         {showDetail && selectedItem && (
           <div className="modal-overlay" onClick={() => setShowDetail(false)}>
@@ -504,11 +581,84 @@ function FeaturePage({ user, onLogout }) {
                   )}
                 </div>
 
+                {/* Health Trend Chart for animals */}
+                {featureKey === 'animals' && selectedItem?.id && (
+                  <div style={{ marginTop: '16px', padding: '16px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                    <HealthTrendChart animalId={selectedItem.id} />
+                  </div>
+                )}
+
+                {/* Herd Risk Assessment UI */}
+                {featureKey === 'herds' && selectedItem?.id && (
+                  <div style={{ marginTop: '16px', padding: '16px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: '600', color: '#334155' }}>Herd Risk Assessment</span>
+                      <button
+                        className="btn-ai"
+                        onClick={() => handleHerdRisk(selectedItem)}
+                        disabled={herdRiskLoading}
+                        style={{ fontSize: '13px', padding: '6px 14px' }}
+                      >
+                        {herdRiskLoading ? 'Assessing...' : 'Run Risk Assessment'}
+                      </button>
+                    </div>
+                    {herdRiskResult && !herdRiskResult.error && (
+                      <div>
+                        {/* Risk score bar */}
+                        <div style={{ marginBottom: '12px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                            <span style={{ fontSize: '13px', color: '#64748B' }}>Overall Risk Score</span>
+                            <span style={{ fontSize: '16px', fontWeight: '700', color: herdRiskResult.risk_level === 'critical' ? '#DC2626' : herdRiskResult.risk_level === 'high' ? '#EA580C' : herdRiskResult.risk_level === 'medium' ? '#D97706' : '#059669' }}>
+                              {herdRiskResult.risk_score}% — {(herdRiskResult.risk_level || '').toUpperCase()}
+                            </span>
+                          </div>
+                          <div style={{ height: '10px', backgroundColor: '#E2E8F0', borderRadius: '5px', overflow: 'hidden' }}>
+                            <div style={{
+                              height: '100%', borderRadius: '5px',
+                              width: `${Math.min(100, herdRiskResult.risk_score || 0)}%`,
+                              backgroundColor: herdRiskResult.risk_level === 'critical' ? '#DC2626' : herdRiskResult.risk_level === 'high' ? '#EA580C' : herdRiskResult.risk_level === 'medium' ? '#D97706' : '#059669',
+                            }} />
+                          </div>
+                        </div>
+                        {/* Species risks */}
+                        {herdRiskResult.species_risks?.length > 0 && (
+                          <div style={{ marginBottom: '12px' }}>
+                            <div style={{ fontSize: '12px', fontWeight: '600', color: '#64748B', textTransform: 'uppercase', marginBottom: '6px' }}>Species Risk Breakdown</div>
+                            {herdRiskResult.species_risks.map((sr, i) => (
+                              <div key={i} style={{ fontSize: '13px', padding: '6px 10px', backgroundColor: '#fff', borderRadius: '6px', marginBottom: '4px', border: '1px solid #E2E8F0' }}>
+                                <span style={{ fontWeight: '600' }}>{sr.species}</span>: {sr.risk} — {sr.reason}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {/* Recommendations */}
+                        {herdRiskResult.recommendations?.length > 0 && (
+                          <div>
+                            <div style={{ fontSize: '12px', fontWeight: '600', color: '#64748B', textTransform: 'uppercase', marginBottom: '6px' }}>Recommendations</div>
+                            <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '13px', color: '#334155' }}>
+                              {herdRiskResult.recommendations.map((r, i) => <li key={i} style={{ marginBottom: '4px' }}>{r}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {herdRiskResult?.error && (
+                      <div style={{ color: '#DC2626', fontSize: '13px' }}>{herdRiskResult.error}</div>
+                    )}
+                  </div>
+                )}
+
                 {config.hasAI && (
                   <div className="ai-section">
                     <button className="btn-ai btn-full" onClick={() => handleAI(selectedItem)} disabled={aiLoading}>
                       {aiLoading ? 'Analyzing...' : config.aiLabel}
                     </button>
+                    {/* Alert indicator for health records with high/critical urgency */}
+                    {featureKey === 'health-records' && selectedItem?.ai_urgency && (selectedItem.ai_urgency === 'High' || selectedItem.ai_urgency === 'Critical') && (
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '8px', padding: '4px 12px', backgroundColor: '#FEE2E2', color: '#DC2626', borderRadius: '12px', fontSize: '12px', fontWeight: '600' }}>
+                        Alert Created
+                      </div>
+                    )}
                     {aiResult && <AIResultDisplay result={aiResult} onClose={() => setAiResult(null)} />}
                   </div>
                 )}
@@ -533,7 +683,22 @@ function FeaturePage({ user, onLogout }) {
               <form onSubmit={handleSubmit}>
                 <div className="modal-body">
                   <div className="form-grid">
-                    {config.fields.map(f => (
+                    {/* Animal selector for disease detection */}
+                  {featureKey === 'disease-detection' && (
+                    <div className="form-group">
+                      <label>Link to Animal <span style={{ color: '#94A3B8', fontSize: '12px' }}>(optional)</span></label>
+                      <select
+                        value={formData['animal_id'] || ''}
+                        onChange={e => setFormData({...formData, animal_id: e.target.value})}
+                      >
+                        <option value="">Select animal...</option>
+                        {allAnimals.map(a => (
+                          <option key={a.id} value={a.id}>{a.name} ({a.tag_id}) — {a.species}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  {config.fields.map(f => (
                       <div key={f.name} className={`form-group ${f.type === 'textarea' ? 'full-width' : ''}`}>
                         <label>{f.label} {f.required && <span className="required">*</span>}</label>
                         {f.type === 'textarea' ? (

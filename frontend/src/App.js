@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import FeaturePage from './pages/FeaturePage';
+import AIToolsPage from './pages/AIToolsPage';
 import './styles/App.css';
 
 function App() {
@@ -44,6 +45,9 @@ function App() {
           } />
           <Route path="/feature/:featureKey" element={
             isAuthenticated ? <FeaturePage user={user} onLogout={handleLogout} /> : <Navigate to="/login" />
+          } />
+          <Route path="/ai-tools" element={
+            isAuthenticated ? <AIToolsPage user={user} onLogout={handleLogout} /> : <Navigate to="/login" />
           } />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

@@ -3,6 +3,7 @@ const router = express.Router();
 const { FeedManagement } = require('../models');
 const auth = require('../middleware/auth');
 const { optimizeFeed } = require('../services/aiService');
+const { aiRateLimiter } = require('../middleware/rateLimiter');
 
 router.get('/', auth, async (req, res) => {
   try {
@@ -42,7 +43,7 @@ router.delete('/:id', auth, async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.post('/ai-optimize', auth, async (req, res) => {
+router.post('/ai-optimize', auth, aiRateLimiter, async (req, res) => {
   try {
     const { animalData, currentFeed } = req.body;
     const result = await optimizeFeed(animalData, currentFeed);

@@ -3,6 +3,7 @@ const router = express.Router();
 const { FinancialRecord } = require('../models');
 const auth = require('../middleware/auth');
 const { financialAnalysis } = require('../services/aiService');
+const { aiRateLimiter } = require('../middleware/rateLimiter');
 
 router.get('/', auth, async (req, res) => {
   try {
@@ -42,7 +43,7 @@ router.delete('/:id', auth, async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.post('/ai-analysis', auth, async (req, res) => {
+router.post('/ai-analysis', auth, aiRateLimiter, async (req, res) => {
   try {
     const records = await FinancialRecord.findAll({ limit: 50, order: [['date', 'DESC']] });
     const result = await financialAnalysis(records.map(r => r.toJSON()));

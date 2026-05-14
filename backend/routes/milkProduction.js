@@ -3,6 +3,7 @@ const router = express.Router();
 const { MilkProduction, Animal } = require('../models');
 const auth = require('../middleware/auth');
 const { milkProductionAnalysis } = require('../services/aiService');
+const { aiRateLimiter } = require('../middleware/rateLimiter');
 
 router.get('/', auth, async (req, res) => {
   try {
@@ -42,7 +43,7 @@ router.delete('/:id', auth, async (req, res) => {
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
-router.post('/ai-analysis', auth, async (req, res) => {
+router.post('/ai-analysis', auth, aiRateLimiter, async (req, res) => {
   try {
     const records = await MilkProduction.findAll({ include: [Animal], limit: 50, order: [['production_date', 'DESC']] });
     const result = await milkProductionAnalysis(records.map(r => r.toJSON()));
