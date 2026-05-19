@@ -4,6 +4,7 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import FeaturePage from './pages/FeaturePage';
 import AIToolsPage from './pages/AIToolsPage';
+import CustomViewsPage from './pages/CustomViewsPage';
 import './styles/App.css';
 
 function App() {
@@ -48,6 +49,9 @@ function App() {
           } />
           <Route path="/ai-tools" element={
             isAuthenticated ? <AIToolsPage user={user} onLogout={handleLogout} /> : <Navigate to="/login" />
+          } />
+          <Route path="/custom-views" element={
+            isAuthenticated ? <CustomViewsPage user={user} onLogout={handleLogout} /> : <Navigate to="/login" />
           } />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

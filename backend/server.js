@@ -141,6 +141,9 @@ async function startServer() {
 
 startServer();
 
+// Custom Livestock Views (mounted before BATCH 05 / 404 boundary)
+app.use('/api/custom-views', require('./routes/customViews'));
+
 // === BATCH 05 AUTO-MOUNT (custom feature suggestions) ===
 app.use('/api/vision-health-monitor', require('./routes/vision-health-monitor'));
 app.use('/api/herd-health-advisor', require('./routes/herd-health-advisor'));
