@@ -70,6 +70,7 @@ app.use('/api/milk-production', require('./routes/milkProduction'));
 app.use('/api/financial-records', require('./routes/financialRecords'));
 app.use('/api/cron', require('./routes/cron'));
 app.use('/api/ai', require('./routes/ai'));
+app.use('/api/parasite-grazing-rotation', require('./routes/parasiteGrazingRotation'));
 
 // Dashboard stats
 const auth = require('./middleware/auth');

@@ -5,7 +5,11 @@ import Dashboard from './pages/Dashboard';
 import FeaturePage from './pages/FeaturePage';
 import AIToolsPage from './pages/AIToolsPage';
 import CustomViewsPage from './pages/CustomViewsPage';
+import ParasiteGrazingRotation from './pages/ParasiteGrazingRotation';
 import './styles/App.css';
+
+import CodexCustomVizFeature from './pages/CodexCustomVizFeature';
+import CodexOperationsFeature from './pages/CodexOperationsFeature';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -38,6 +42,9 @@ function App() {
     <Router>
       <div className="app">
         <Routes>
+        <Route path="/codex/custom-viz" element={<CodexCustomVizFeature />} />
+        <Route path="/codex/operations" element={<CodexOperationsFeature />} />
+
           <Route path="/login" element={
             isAuthenticated ? <Navigate to="/" /> : <Login onLogin={handleLogin} />
           } />
@@ -52,6 +59,9 @@ function App() {
           } />
           <Route path="/custom-views" element={
             isAuthenticated ? <CustomViewsPage user={user} onLogout={handleLogout} /> : <Navigate to="/login" />
+          } />
+          <Route path="/parasite-grazing-rotation" element={
+            isAuthenticated ? <ParasiteGrazingRotation user={user} onLogout={handleLogout} /> : <Navigate to="/login" />
           } />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

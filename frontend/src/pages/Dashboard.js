@@ -34,6 +34,13 @@ function Dashboard({ user, onLogout }) {
           <h1 className="app-title">AI Livestock Health Monitoring</h1>
         </div>
         <div className="top-bar-right">
+          <button
+            onClick={() => navigate('/custom-views')}
+            data-testid="sidebar-livestock-views"
+            style={{ background: '#0891b2', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600, marginRight: 12 }}
+          >
+            Livestock Views
+          </button>
           <span className="user-name">Welcome, {user?.name}</span>
           <button className="btn-logout" onClick={onLogout}>Logout</button>
         </div>

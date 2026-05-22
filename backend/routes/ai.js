@@ -28,7 +28,7 @@ router.post('/disease-risk-assessment', async (req, res) => {
     const { herdId, animalIds, weather } = req.body;
     const animals = animalIds && animalIds.length
       ? await Animal.findAll({ where: { id: animalIds } })
-      : (herdId ? await Animal.findAll({ where: { herdId } }) : await Animal.findAll({ limit: 25 }));
+      : (herdId ? await Animal.findAll({ where: { herd_id: herdId } }) : await Animal.findAll({ limit: 25 }));
     const recentVacc = await Vaccination.findAll({ limit: 50, order: [['createdAt', 'DESC']] });
 
     const systemPrompt = 'You are a veterinary epidemiologist. Respond with valid JSON only, no markdown fences.';
@@ -72,7 +72,7 @@ Return JSON: { recommended_pairings: [{ candidate_id, score (0-100), genetic_rat
 router.post('/health-anomaly-detector', async (req, res) => {
   try {
     const { animalId, herdId } = req.body;
-    const where = animalId ? { animalId } : (herdId ? { herdId } : {});
+    const where = animalId ? { animal_id: animalId } : {};
     const recentHealth = await HealthRecord.findAll({ where, limit: 50, order: [['createdAt', 'DESC']] });
 
     const systemPrompt = 'You are a livestock veterinary AI. Respond with valid JSON only, no markdown fences.';
@@ -94,7 +94,7 @@ router.post('/nutrition-optimizer', async (req, res) => {
     const { herdId, animalId, targetGoal } = req.body;
     const animals = animalId
       ? await Animal.findAll({ where: { id: animalId } })
-      : (herdId ? await Animal.findAll({ where: { herdId } }) : await Animal.findAll({ limit: 25 }));
+      : (herdId ? await Animal.findAll({ where: { herd_id: herdId } }) : await Animal.findAll({ limit: 25 }));
     const feeds = await FeedManagement.findAll({ limit: 30, order: [['createdAt', 'DESC']] });
 
     const systemPrompt = 'You are a livestock nutritionist. Respond with valid JSON only, no markdown fences.';
