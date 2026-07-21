@@ -1,111 +1,62 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# AI Livestock Health Monitoring - Start Script
-# This script sets up and starts the complete application
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$PROJECT_DIR"
+API_DIR="backend"
+UI_DIR="frontend"
+MIGRATION="backend/migrations/001_governed_workflows.sql"
 
-set -e
-
-APP_DIR="$(cd "$(dirname "$0")" && pwd)"
-BACKEND_PORT=3001
-FRONTEND_PORT=3000
-
-echo "======================================"
-echo "  AI Livestock Health Monitoring"
-echo "  Starting Application..."
-echo "======================================"
-
-# Function to clean up on exit
-cleanup() {
-    echo ""
-    echo "Shutting down services..."
-    if [ ! -z "$BACKEND_PID" ]; then kill $BACKEND_PID 2>/dev/null || true; fi
-    if [ ! -z "$FRONTEND_PID" ]; then kill $FRONTEND_PID 2>/dev/null || true; fi
-    # Kill any remaining processes on our ports
-    lsof -ti:$BACKEND_PORT | xargs kill -9 2>/dev/null || true
-    lsof -ti:$FRONTEND_PORT | xargs kill -9 2>/dev/null || true
-    echo "All services stopped."
-    exit 0
+check() {
+  command -v node >/dev/null || { echo "node is required" >&2; return 1; }
+  command -v npm >/dev/null || { echo "npm is required" >&2; return 1; }
+  [[ -f .env ]] || { echo "Create .env from .env.example; defaults are not generated." >&2; return 1; }
+  grep -Eq '^JWT_SECRET=.{32,}$' .env || { echo "JWT_SECRET must contain at least 32 characters." >&2; return 1; }
+  grep -Eq '^GOVERNANCE_TENANT_ID=[A-Za-z0-9][A-Za-z0-9._:-]+$' .env ||
+    { echo "GOVERNANCE_TENANT_ID is required for signed tenant claims." >&2; return 1; }
+  grep -Eq '^DATABASE_URL=.+|^DB_HOST=.+' .env ||
+    { echo "DATABASE_URL or explicit DB_* settings are required." >&2; return 1; }
+  if grep -Eqi 'password123|secure123|your_.*key|change[_-]?me|placeholder' .env; then
+    echo "Refusing placeholder or demo credentials." >&2
+    return 1
+  fi
+  echo "Configuration shape is valid; credentials and connectivity were not verified."
 }
 
-trap cleanup SIGINT SIGTERM
+migrate() {
+  check
+  [[ "${ALLOW_SCHEMA_MIGRATION:-false}" == "true" ]] ||
+    { echo "Set ALLOW_SCHEMA_MIGRATION=true for this explicit operation." >&2; return 1; }
+  : "${DATABASE_URL:?Export DATABASE_URL for the migration process.}"
+  command -v psql >/dev/null || { echo "psql is required" >&2; return 1; }
+  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$MIGRATION"
+}
 
-# Step 1: Clean used ports
-echo ""
-echo "[1/6] Cleaning used ports..."
-lsof -ti:$BACKEND_PORT | xargs kill -9 2>/dev/null || echo "  Port $BACKEND_PORT is free"
-lsof -ti:$FRONTEND_PORT | xargs kill -9 2>/dev/null || echo "  Port $FRONTEND_PORT is free"
-sleep 1
+start_services() {
+  check
+  [[ -d "$API_DIR/node_modules" && -d "$UI_DIR/node_modules" ]] ||
+    { echo "Dependencies are absent; run reviewed locked installs separately." >&2; return 1; }
 
-# Step 2: Check PostgreSQL
-echo ""
-echo "[2/6] Checking PostgreSQL..."
-if ! pg_isready -q 2>/dev/null; then
-    echo "  Starting PostgreSQL..."
-    brew services start postgresql@14 2>/dev/null || brew services start postgresql 2>/dev/null || {
-        echo "  ERROR: PostgreSQL is not running. Please start it manually."
-        exit 1
-    }
-    sleep 2
-fi
-echo "  PostgreSQL is running"
+  npm --prefix "$API_DIR" start &
+  api_pid=$!
+  if node -e "const p=require('./$UI_DIR/package.json');process.exit(p.scripts&&p.scripts.dev?0:1)"; then
+    npm --prefix "$UI_DIR" run dev &
+  else
+    BROWSER=none npm --prefix "$UI_DIR" start &
+  fi
+  ui_pid=$!
 
-# Step 3: Create database if not exists
-echo ""
-echo "[3/6] Setting up database..."
-createdb livestock_health 2>/dev/null || echo "  Database 'livestock_health' already exists"
+  cleanup() {
+    kill "$api_pid" "$ui_pid" 2>/dev/null || true
+    wait "$api_pid" "$ui_pid" 2>/dev/null || true
+  }
+  trap cleanup EXIT INT TERM
+  wait "$api_pid" "$ui_pid"
+}
 
-# Step 4: Install dependencies
-echo ""
-echo "[4/6] Installing dependencies..."
-cd "$APP_DIR/backend"
-if [ ! -d "node_modules" ]; then
-    echo "  Installing backend dependencies..."
-    npm install --silent
-else
-    echo "  Backend dependencies already installed"
-fi
-
-cd "$APP_DIR/frontend"
-if [ ! -d "node_modules" ]; then
-    echo "  Installing frontend dependencies..."
-    npm install --silent
-else
-    echo "  Frontend dependencies already installed"
-fi
-
-# Step 5: Seed database
-echo ""
-echo "[5/6] Seeding database..."
-cd "$APP_DIR/backend"
-node seed.js
-
-# Step 6: Start services with hot reload
-echo ""
-echo "[6/6] Starting services with hot reload..."
-echo ""
-
-# Start backend with nodemon for hot reload
-cd "$APP_DIR/backend"
-npx nodemon server.js &
-BACKEND_PID=$!
-echo "  Backend started (PID: $BACKEND_PID) on http://localhost:$BACKEND_PORT"
-
-# Start frontend (react-scripts has built-in hot reload)
-cd "$APP_DIR/frontend"
-BROWSER=none PORT=$FRONTEND_PORT npm start &
-FRONTEND_PID=$!
-echo "  Frontend started (PID: $FRONTEND_PID) on http://localhost:$FRONTEND_PORT"
-
-echo ""
-echo "======================================"
-echo "  Application is running!"
-echo "  Frontend: http://localhost:$FRONTEND_PORT"
-echo "  Backend:  http://localhost:$BACKEND_PORT"
-echo ""
-echo "  Login: admin@livestock.com / password123"
-echo ""
-echo "  Press Ctrl+C to stop all services"
-echo "======================================"
-
-# Wait for both processes
-wait
+case "${1:-check}" in
+  check) check ;;
+  migrate) migrate ;;
+  start) start_services ;;
+  *) echo "Usage: ./start.sh [check|migrate|start]" >&2; exit 64 ;;
+esac

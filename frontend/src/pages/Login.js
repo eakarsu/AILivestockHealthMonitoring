@@ -20,11 +20,6 @@ function Login({ onLogin }) {
     setLoading(false);
   };
 
-  const fillCredentials = () => {
-    setEmail('admin@livestock.com');
-    setPassword('password123');
-  };
-
   return (
     <div className="login-page">
       <div className="login-container">
@@ -49,9 +44,6 @@ function Login({ onLogin }) {
           </div>
           <button type="submit" className="btn-primary btn-full" disabled={loading}>
             {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-          <button type="button" className="btn-secondary btn-full" onClick={fillCredentials} style={{marginTop: '12px'}}>
-            Quick Login (Demo Credentials)
           </button>
         </form>
       </div>

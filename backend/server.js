@@ -108,16 +108,19 @@ app.get('/api/dashboard/stats', auth, async (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+app.use('/api/governed-veterinary-monitoring', require('./governance'));
 
 async function startServer() {
   try {
     await sequelize.authenticate();
     console.log('Database connected successfully');
-    await sequelize.sync({ alter: true });
-    console.log('Database synced');
+    if (process.env.AUTO_INIT_SCHEMA === 'true') {
+      await sequelize.sync({ alter: true });
+      console.log('Database synced');
+    }
 
     // Ensure ai_analyses table exists for AI result persistence
-    await sequelize.query(`
+    if (process.env.AUTO_INIT_SCHEMA === 'true') await sequelize.query(`
       CREATE TABLE IF NOT EXISTS ai_analyses (
         id SERIAL PRIMARY KEY,
         animal_id INTEGER,
@@ -145,24 +148,13 @@ startServer();
 // Custom Livestock Views (mounted before BATCH 05 / 404 boundary)
 app.use('/api/custom-views', require('./routes/customViews'));
 
-// === BATCH 05 AUTO-MOUNT (custom feature suggestions) ===
+// Generated prototype routes are opt-in for isolated, non-production evaluation.
+if (process.env.ENABLE_GENERATED_ROUTES === 'true' && process.env.NODE_ENV !== 'production') {
 app.use('/api/vision-health-monitor', require('./routes/vision-health-monitor'));
 app.use('/api/herd-health-advisor', require('./routes/herd-health-advisor'));
 app.use('/api/biosecurity-stream', require('./routes/biosecurity-stream'));
 app.use('/api/breeding-optimizer', require('./routes/breeding-optimizer'));
 app.use('/api/antibiotic-compliance', require('./routes/antibiotic-compliance'));
 
-// === Batch 05 Gaps & Frontend Mounts ===
-try { const _gap_ai_disease_risk_assessment = require('./routes/gap-ai-disease-risk-assessment'); app.use('/api/gap-ai-disease-risk-assessment', _gap_ai_disease_risk_assessment); } catch(e) { console.error('gap mount fail ai-disease-risk-assessment:', e.message); }
-try { const _gap_ai_breeding_advisor = require('./routes/gap-ai-breeding-advisor'); app.use('/api/gap-ai-breeding-advisor', _gap_ai_breeding_advisor); } catch(e) { console.error('gap mount fail ai-breeding-advisor:', e.message); }
-try { const _gap_ai_nutrition_optimizer = require('./routes/gap-ai-nutrition-optimizer'); app.use('/api/gap-ai-nutrition-optimizer', _gap_ai_nutrition_optimizer); } catch(e) { console.error('gap mount fail ai-nutrition-optimizer:', e.message); }
-try { const _gap_ai_health_anomaly_detector = require('./routes/gap-ai-health-anomaly-detector'); app.use('/api/gap-ai-health-anomaly-detector', _gap_ai_health_anomaly_detector); } catch(e) { console.error('gap mount fail ai-health-anomaly-detector:', e.message); }
-try { const _gap_ai_economic_forecaster = require('./routes/gap-ai-economic-forecaster'); app.use('/api/gap-ai-economic-forecaster', _gap_ai_economic_forecaster); } catch(e) { console.error('gap mount fail ai-economic-forecaster:', e.message); }
-try { const _gap_iot = require('./routes/gap-iot'); app.use('/api/gap-iot', _gap_iot); } catch(e) { console.error('gap mount fail iot:', e.message); }
-try { const _gap_veterinary = require('./routes/gap-veterinary'); app.use('/api/gap-veterinary', _gap_veterinary); } catch(e) { console.error('gap mount fail veterinary:', e.message); }
-try { const _gap_compliance = require('./routes/gap-compliance'); app.use('/api/gap-compliance', _gap_compliance); } catch(e) { console.error('gap mount fail compliance:', e.message); }
-try { const _gap_mobile = require('./routes/gap-mobile'); app.use('/api/gap-mobile', _gap_mobile); } catch(e) { console.error('gap mount fail mobile:', e.message); }
-try { const _gap_milk = require('./routes/gap-milk'); app.use('/api/gap-milk', _gap_milk); } catch(e) { console.error('gap mount fail milk:', e.message); }
-try { const _gap_weather_driven = require('./routes/gap-weather-driven'); app.use('/api/gap-weather-driven', _gap_weather_driven); } catch(e) { console.error('gap mount fail weather-driven:', e.message); }
-try { const _gap_limited = require('./routes/gap-limited'); app.use('/api/gap-limited', _gap_limited); } catch(e) { console.error('gap mount fail limited:', e.message); }
-// === End Batch 05 Mounts ===
+}
+// Generated gap routes remain deliberately unmounted.

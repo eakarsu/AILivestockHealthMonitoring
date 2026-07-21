@@ -2,6 +2,14 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const router = express.Router();
 const { User } = require('../models');
+const authenticateToken = require('../middleware/auth');
+router.use((req, res, next) => {
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32 ||
+      !/^[A-Za-z0-9][A-Za-z0-9._:-]+$/.test(process.env.GOVERNANCE_TENANT_ID || '')) {
+    return res.status(503).json({ error: 'Authentication is not configured' });
+  }
+  next();
+});
 
 router.post('/login', async (req, res) => {
   try {
@@ -11,7 +19,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, name: user.name },
+      { id: user.id, email: user.email, role: user.role, name: user.name, tenantId: process.env.GOVERNANCE_TENANT_ID },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -23,12 +31,13 @@ router.post('/login', async (req, res) => {
 
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password } = req.body;
+    if (!email || !password || password.length < 12) return res.status(400).json({ error: 'Valid email and 12-character password required' });
     const existing = await User.findOne({ where: { email } });
     if (existing) return res.status(400).json({ error: 'Email already registered' });
-    const user = await User.create({ name, email, password, role });
+    const user = await User.create({ name, email, password, role: 'farmer' });
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, name: user.name },
+      { id: user.id, email: user.email, role: user.role, name: user.name, tenantId: process.env.GOVERNANCE_TENANT_ID },
       process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -36,6 +45,10 @@ router.post('/register', async (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+router.get('/me', authenticateToken, (req, res) => {
+  res.json({ user: req.user });
 });
 
 module.exports = router;
