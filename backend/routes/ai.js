@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const aiService = require('../services/aiService');
+const auth = require('../middleware/auth');
 const { Animal, HealthRecord, Vaccination, FeedManagement, BreedingRecord, FinancialRecord } = require('../models');
+
+router.use(auth);
 
 function ensureAIKey(res) {
   if (!process.env.OPENROUTER_API_KEY) {

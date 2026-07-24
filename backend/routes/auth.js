@@ -47,8 +47,14 @@ router.post('/register', async (req, res) => {
   }
 });
 
-router.get('/me', authenticateToken, (req, res) => {
-  res.json({ user: req.user });
+router.get('/me', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id, { attributes: ['id', 'name', 'email', 'role'] });
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({ user });
+  } catch (_) {
+    res.status(503).json({ error: 'Authentication service unavailable' });
+  }
 });
 
 module.exports = router;

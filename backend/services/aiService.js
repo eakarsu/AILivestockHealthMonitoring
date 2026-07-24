@@ -2,10 +2,12 @@ require('dotenv').config({ path: require('path').join(__dirname, '../../.env') }
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'anthropic/claude-3-5-sonnet-20241022';
+const OPENROUTER_BASE_URL = (process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/$/, '');
 
 async function queryAI(prompt, systemPrompt = '') {
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    if (!OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY is not configured');
+    const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
@@ -30,11 +32,13 @@ async function queryAI(prompt, systemPrompt = '') {
     }
 
     const data = await response.json();
-    return {
-      content: data.choices?.[0]?.message?.content || 'No response generated',
+    const result = {
+      content: data.choices?.[0]?.message?.content,
       model: data.model,
       usage: data.usage
     };
+    if (!result.content || !String(result.content).trim()) throw new Error('OpenRouter returned empty content');
+    return result;
   } catch (error) {
     console.error('AI query failed:', error.message);
     throw new Error('AI service temporarily unavailable');
