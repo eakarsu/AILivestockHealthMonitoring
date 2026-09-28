@@ -121,6 +121,11 @@ start_services() {
     { echo "Dependencies are absent; run reviewed locked installs separately." >&2; return 1; }
 
   if [[ "${ALLOW_SCHEMA_MIGRATION:-false}" == "true" ]]; then migrate; fi
+  if [[ "${NODE_ENV:-development}" != "production" && "${ENABLE_DEMO_CREDENTIAL_AUTOFILL:-true}" == "true" ]]; then
+    PROVISION_ADMIN_EMAIL="${DEMO_EMAIL:?DEMO_EMAIL is required}" \
+      PROVISION_ADMIN_PASSWORD="${DEMO_PASSWORD:?DEMO_PASSWORD is required}" \
+      node "$API_DIR/scripts/prepareRuntime.js"
+  fi
   for port in "$BACKEND_PORT" "$FRONTEND_PORT"; do
     if lsof -tiTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
       echo "Port $port is already in use; refusing to terminate another process." >&2
