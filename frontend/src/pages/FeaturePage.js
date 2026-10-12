@@ -308,7 +308,7 @@ function FeaturePage({ user, onLogout }) {
     if (featureKey === 'disease-detection') {
       API.animalsAPI.getAll({ limit: 200 }).then(r => {
         const data = r.data;
-        setAllAnimals(Array.isArray(data) ? data : data.data || []);
+        setAllAnimals(Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : []);
       }).catch(() => {});
     }
   }, [featureKey]);
@@ -316,23 +316,30 @@ function FeaturePage({ user, onLogout }) {
   const loadData = useCallback(async (pageNum = 1) => {
     try {
       setLoading(true);
+      setError('');
       const res = await config.api.getAll({ page: pageNum, limit: PAGE_SIZE });
       const data = res.data;
-      if (data && data.data && data.pagination) {
+      if (Array.isArray(data?.data) && data.pagination) {
         setItems(data.data);
         setTotalPages(data.pagination.totalPages || 1);
-        setTotalCount(data.pagination.total || 0);
+        setTotalCount(data.pagination.total ?? data.data.length);
       } else if (Array.isArray(data)) {
         setItems(data);
         setTotalPages(1);
         setTotalCount(data.length);
+      } else if (Array.isArray(data?.data)) {
+        setItems(data.data);
+        setTotalPages(1);
+        setTotalCount(data.data.length);
       } else {
-        setItems(data);
+        setItems([]);
         setTotalPages(1);
         setTotalCount(0);
+        setError('The record service returned an invalid list response.');
       }
     } catch (err) {
-      setError('Failed to load data');
+      setItems([]);
+      setError(err?.response?.data?.error || 'Failed to load data');
     }
     setLoading(false);
   }, [config.api]);

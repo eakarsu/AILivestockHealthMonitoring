@@ -1,7 +1,10 @@
 import React from 'react';
+import AIReport from './AIReport';
 
 function AIResultDisplay({ result, onClose }) {
   if (!result) return null;
+
+  if (!result.error) return <div className="ai-result-container">{onClose && <button type="button" className="btn-close-sm" onClick={onClose} aria-label="Close AI result">×</button>}<AIReport response={result} title="AI analysis result" /></div>;
 
   const parseContent = (content) => {
     if (!content) return [];

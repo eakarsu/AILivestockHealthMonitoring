@@ -110,6 +110,14 @@ app.get('/api/health', (req, res) => {
 });
 app.use('/api/governed-veterinary-monitoring', require('./governance'));
 
+
+// Advisory AI reports only; native execution and approval routes stay unchanged.
+const aiWorkspaceSupport = require("./aiWorkspaceAdapters.cjs");
+const aiWorkspaceDatabase = aiWorkspaceSupport.sequelizeQueryClient(require("./config/database.js"));
+app.use('/api/report-workspace', require("./aiWorkspace.cjs").createAIWorkspaceRouter({
+  pool: aiWorkspaceDatabase, authenticateToken: require("./middleware/auth.js"),
+  aiRateLimiter: aiWorkspaceSupport.createWorkspaceLimiter(), features: require("./aiWorkspaceFeatures.json"),
+}));
 async function startServer() {
   try {
     await sequelize.authenticate();
@@ -119,8 +127,10 @@ async function startServer() {
       console.log('Database synced');
     }
 
-    // Ensure ai_analyses table exists for AI result persistence
-    if (process.env.AUTO_INIT_SCHEMA === 'true') await sequelize.query(`
+    // Ensure ai_analyses table exists for AI result persistence.
+    // Created unconditionally (CREATE TABLE IF NOT EXISTS) so AI-result reads/writes
+    // do not 500 when AUTO_INIT_SCHEMA is unset.
+    await sequelize.query(`
       CREATE TABLE IF NOT EXISTS ai_analyses (
         id SERIAL PRIMARY KEY,
         animal_id INTEGER,
